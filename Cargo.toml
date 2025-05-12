@@ -1,0 +1,10 @@
+[package]
+name = "vcb-clipboard"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+base64 = "0.22.1"
+ndarray = "0.16.1"
+anyhow = "1.0.69"
+zstd = "0.13.3"
