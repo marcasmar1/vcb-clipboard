@@ -6,48 +6,74 @@ use zstd::decode_all;
 
 mod blueprint;
 
-use crate::blueprint::{Blueprint, BlueprintPrimitive};
+use crate::blueprint::*; //{Blueprint, BlueprintPrimitive};
 use binrw::BinRead;
 
-// TODO: Use binrw to simplify the process of reading binary text
-// TODO: use Appendix/Blueprint Specification to get the clipboard format.
-/* FORMAT SPECIFICATION
-Overview
-    - Start with "VCB+" prefix
-    - Encoded in base 64
-    - Bytes in big endian
-Header
-    3-byte blueprint version
-    6-byte checksum (truncated SHA-1) of the remaining characters in the string
-    4-byte width
-    4-byte height
-Layer Blocks (One per layer)
-    4-byte block size (The size Layer Blokcs in bytes)
-    4-byte layer id (0 logic, 1 deco on, 2 deco off)
-    4-byte uncompressed buffer size
-    N-byte zstd compressed RGBA8 buffer
-Text Blocks (Optional, one per text block type)
-    4-byte block size (The size Layer Blokcs in bytes)
-    4-byte data id (1024 Name, 1025 Description, 1026 Tags)
-    4-byte uncompressed buffer size
-    N-byte zstd compressed UTF-8 buffer
-
-*/
-
-// BASE64_STANDARD.decode(logic_data)?
-
-const HEADER_SIZE_BYTES: usize = 32;
-
-const ZSTD_MAGIC_NUMBER: u32 = 0xFD2FB528;
+use colored::*;
 
 fn main() {
     let clipboard ="VCB+AAAAfoAZnr9sAAAACQAAAAwAAABHAAAAAAAAAbAotS/9YLAAjQEAoAAAZniO/6GYVk04Pv8uR13/kv9jCwDJiaEACPgJAnB2FAsAEFgYugIbOLCbzaMACwAAAB8AAAABAAABsCi1L/1gsABNAAAQAAABAKsqwAIAAAAfAAAAAgAAAbAotS/9YLAATQAAEAAAAQCrKsAC";
     // TODO: Move this to clipboard_to_blueprint function
     let clipboard = clipboard.strip_prefix("VCB+").unwrap();
 
+    let clipboard = BASE64_STANDARD.decode(clipboard).unwrap();
+
+    let aligned_clipboard = clipboard.clone().split_off(9);
+    for (position, chunk) in aligned_clipboard.chunks_exact(4).enumerate() {
+        print!("{:#04x}:\t", position * 4 + 9);
+        for val in chunk {
+            print!("{:02x}\t", val);
+        }
+        println!("");
+    }
+
     let blueprint = BlueprintPrimitive::read(&mut Cursor::new(clipboard)).unwrap();
+
+    let grid = match &blueprint.block_info[0].content {
+        BlockPayload::Logic(x) => Some(x.rgba8_buffer.clone()),
+        _ => None,
+    }
+    .unwrap();
+
+    show_grid(
+        grid,
+        blueprint.header.height as usize,
+        blueprint.header.width as usize,
+    );
 
     let blueprint: Blueprint = blueprint.try_into().unwrap();
 
-    println!("{:?}", blueprint);
+    for row in blueprint.logic_grid.rows() {
+        for rgba in row {
+            let r = (rgba >> 24) as u8;
+            let g = ((rgba >> 16) & 0xFF) as u8;
+            let b = ((rgba >> 8) & 0xFF) as u8;
+            let _a = (rgba & 0xFF) as u8;
+
+            print!("{}", "██".truecolor(r, g, b));
+        }
+        println!();
+    }
+    //println!("{:#?}", blueprint);
+}
+
+fn show_grid(grid: Vec<u32>, height: usize, width: usize) -> () {
+    let grid = Array2::from_shape_vec([height, width], grid).unwrap();
+
+    println!("{:?}", grid);
+
+    for row in 0..height {
+        for col in 0..width {
+            let rgba = grid[[row, col]];
+            let r = (rgba >> 24) as u8;
+            let g = ((rgba >> 16) & 0xFF) as u8;
+            let b = ((rgba >> 8) & 0xFF) as u8;
+            let _a = (rgba & 0xFF) as u8;
+
+            // Create a colored block using the RGB values
+            let block = "██".truecolor(r, g, b);
+            print!("{}", block);
+        }
+        println!();
+    }
 }
