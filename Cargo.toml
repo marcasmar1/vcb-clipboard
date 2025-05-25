@@ -3,6 +3,10 @@ name = "vcb-clipboard"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "vcb_clipboard"
+path = "src/lib.rs"
+
 [dependencies]
 base64 = "0.22.1"
 ndarray = "0.16.1"
